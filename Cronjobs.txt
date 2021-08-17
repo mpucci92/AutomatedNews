@@ -1,0 +1,5 @@
+#Automated News File Creation
+00 05 * * * . $HOME/.profile; $HOME/miniconda3/bin/python3.8 $HOME/OscrapTwitterGC/AutomatedNews/main.py
+
+# Deleting of Logs
+04 15 * * SUN rm -rf home/dev3_compoundguru/OscrapTwitterGC/AutomatedNews/Logs/*
