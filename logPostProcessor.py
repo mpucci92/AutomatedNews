@@ -7,7 +7,7 @@ currentDate = date.today()
 currentDate = currentDate.strftime("%Y-%m-%dT%H:%M:%S")
 currentDate = currentDate.split('T')[0]
 
-filename = 'logPostProcessor.py'
+filename = os.path.basename(__file__)
 path = os.path.abspath(filename)
 directory = os.path.dirname(path)
 saveLocationLogs = directory + "\\Logs\\"
@@ -19,7 +19,6 @@ def drop_consecutive_duplicates(a):
 def logPostProcess():
     logText = []
     file = saveLocationLogs + f'{currentDate}' + '.log'
-    Logfile = saveLocationLogs + f'{currentDate}' + '.txt'
 
     with open(file) as f:
         lines = f.readlines()
@@ -33,4 +32,4 @@ def logPostProcess():
 
     dfNew = pd.DataFrame()
     dfNew['finaltext'] = drop_consecutive_duplicates(a)
-    dfNew.to_csv(Logfile, index=False, header=False)
+    dfNew.to_csv(file, index=False, header=False)

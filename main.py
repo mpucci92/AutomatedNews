@@ -1,23 +1,24 @@
 from NewsTweetsVolume import *
 from getData import *
+from logPostProcessor import *
 
 
 if __name__ == '__main__':
-    # Step 1 - Generate News Volume per period - Set this to 1 to grab over the last day
+    """
+    Change the value of '1' to a different value to change lookback period to obtain data
+    """
 
-    dfTweets = newsVolumeDailyTS('tweets',1, f'{currentDate}'+'T23:59:59')
-    saveData('tweets',dfTweets)
+    
+    indexes = ['news','tweets']
 
-    dfNews = newsVolumeDailyTS('news', 1, f'{currentDate}' + 'T23:59:59')
-    saveData('news', dfNews)
+    for index in indexes:
+        dfVolumeDaily = newsVolumeDailyTS(index, 1, f'{currentDate}' + 'T23:59:59')
+        saveData(index,dfVolumeDaily)
 
-    # Step 2 - create final dataframe and save to 'Final Data' folder
+        df = finalDataFrame(index)
+        finalSave(df, index)
 
-    df = finalDataFrame('news')
-    finalSave(df, 'news')
-
-    df = finalDataFrame('tweets')
-    finalSave(df, 'tweets')
+    logPostProcess()
 
 
 

@@ -29,6 +29,7 @@ dt = datetime.now()
 localTime = dt.date()
 currentDate = date.today()
 
+
 def volumeIndicatorTimeSeriesAll(index, lookbackPeriod, timeframe, customDate=None, customInterval=None):
     """
         Method used to generate zipped list of timestamp,ticker,news count for all tickers as Time Series.
@@ -43,8 +44,9 @@ def volumeIndicatorTimeSeriesAll(index, lookbackPeriod, timeframe, customDate=No
         USE ONLY if you want to collect ALL tickers for a given period - use function above for subset of tickers.
 
         """
-    log = datalogger(index, 'NewsTweetsVolume.py')
-    log.info('Filename: NewsTweetsVolume.py')
+    filename = os.path.basename(__file__)
+    log = datalogger()
+    log.info('Filename: ' + f'{filename}')
     log.info('Index: ' + f'{index}')
     log.info('Date: ' + f'{currentDate}')
     log.info('ElasticSearch Volume Timeseries Data Acquisition: ')
@@ -149,12 +151,12 @@ def volumeIndicatorTimeSeriesAll(index, lookbackPeriod, timeframe, customDate=No
     log.info('Length of Ticker List: ' + str(len(tickerList)))
     log.info('Length of Count List: ' + str(len(countList)))
 
-    return list(zip(timestamp, tickerList, countList))
+    return list(zip(timestamp, tickerList, countList)), log
 
 def newsVolumeDailyTS(index,lookback,customtime):
-    log.info('Beginning Daily News Volume Timeseries Dataframe!')
-
-    list_of_tuples = (volumeIndicatorTimeSeriesAll(index, lookback, 'custom', customDate=customtime, customInterval=1))
+    global log
+    list_of_tuples = (volumeIndicatorTimeSeriesAll(index, lookback, 'custom', customDate=customtime, customInterval=1))[0]
+    log = (volumeIndicatorTimeSeriesAll(index, lookback, 'custom', customDate=customtime, customInterval=1))[1]
     df = pd.DataFrame(list_of_tuples, columns=['date', 'ticker','count'])
     df = df[df['count']>1]
     sorted_df = (df.sort_values(by='date',ascending=False))

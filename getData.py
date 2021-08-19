@@ -5,12 +5,7 @@ from Logger import *
 from CONFIG import configFile
 import numpy as np
 import pandas as pd
-import itertools
-from datetime import datetime, timedelta,time,date
-import json
-import glob
-import time
-import sys
+from datetime import datetime, timedelta,date
 import os
 
 pd.set_option('display.max_rows', None)
@@ -32,7 +27,7 @@ CONFIG = configFile()
 es_client = Elasticsearch([CONFIG['elasticsearchIP']],http_compress=True)
 
 # Saving Data Path Location
-filename = 'getData.py'
+filename = os.path.basename(__file__)
 path = os.path.abspath(filename)
 directory = os.path.dirname(path)
 saveLocation = directory + "\\Data\\"
@@ -40,6 +35,7 @@ saveLocation = directory + "\\Data\\"
 saveLocationLogs = directory + "\\Logs\\"
 finalSaveLocationNews =  directory + "\\Final Data\\News\\"
 finalSaveLocationTweets = directory + "\\Final Data\\Tweets\\"
+
 
 def themedf(index,keyword,start_time,end_time):
     """
@@ -51,17 +47,17 @@ def themedf(index,keyword,start_time,end_time):
     return: Returns either tweet or news article dataframe with timestamp, title/tweet, tickers/cashtag,
             sentiment score, length (how many tags per title/tweet)   Length of tags 1 to 4(inclusive)
     """
-
+    global logData
     apisearch = APISearch()
     items=[]
 
     if index == 'news':
+        filename = os.path.basename(__file__)
+        logData = datalogger()
+        logData.info('Filename: ' + f'{filename}')
+        logData.info('Index: ' + f'{index}')
+        logData.info('Date: ' + f'{currentDate}')
 
-        log = datalogger(index, 'getData.py')
-        log.info('Filename: getData.py')
-        log.info('Index: ' + f'{index}')
-        log.info('Date: ' + f'{currentDate}')
-        log.info('ElasticSearch Data Acquisition: ')
 
         query = (APISearch.search_news(apisearch, search_string=keyword, timestamp_from=start_time, timestamp_to=end_time))
         res = es_client.search(index=index, body=query, size=10000,scroll='2m')
@@ -74,7 +70,6 @@ def themedf(index,keyword,start_time,end_time):
                 break
 
             res = es_client.scroll(scroll_id=scroll_id, scroll='2m')
-            log.info("Number of items: " + str(len(items)))
 
         df = GenerateDataset(index)
 
@@ -86,16 +81,15 @@ def themedf(index,keyword,start_time,end_time):
         dfTicker['published_datetime'] = dfTicker['published_datetime'].apply(lambda x: x.split('T')[0])
         dfTicker = dfTicker[(dfTicker['length']>=1) & dfTicker['length']<=4]
 
-        log.info('Completion of raw ElasticSearch Dataframe and document taggging')
-        log.info('Length of Dataframe, dfTicker: ' + str(len(dfTicker)))
+        logData.info('Completion of raw ElasticSearch Dataframe and document tagging')
+        logData.info('Length of Dataframe, dfTicker: ' + str(len(dfTicker)))
 
     elif index == 'tweets':
-
-        log = datalogger(index, 'getData.py')
-        log.info('Filename: getData.py')
-        log.info('Index: ' + f'{index}')
-        log.info('Date: ' + f'{currentDate}')
-        log.info('ElasticSearch Data Acquisition: ')
+        filename = os.path.basename(__file__)
+        logData = datalogger()
+        logData.info('Filename: ' + f'{filename}')
+        logData.info('Index: ' + f'{index}')
+        logData.info('Date: ' + f'{currentDate}')
 
         query = (APISearch.search_tweets(apisearch, search_string=keyword, timestamp_from=start_time, timestamp_to=end_time))
         res = es_client.search(index=index, body=query, size=10000,scroll='2m')
@@ -108,7 +102,6 @@ def themedf(index,keyword,start_time,end_time):
                 break
 
             res = es_client.scroll(scroll_id=scroll_id, scroll='2m')
-            log.info("Number of items: " + str(len(items)))
 
         df = GenerateDataset(index)
 
@@ -119,14 +112,16 @@ def themedf(index,keyword,start_time,end_time):
         dfTicker['timestamp'] = dfTicker['timestamp'].apply(lambda x: x.split('T')[0])
         dfTicker = dfTicker[(dfTicker['length']>=1) & dfTicker['length']<=4]
 
-        log.info('Completion of raw ElasticSearch Dataframe and document taggging')
-        log.info('Length of Dataframe, dfTicker: ' + str(len(dfTicker)))
+        logData.info('Completion of raw ElasticSearch Dataframe and document tagging')
+        logData.info('Length of Dataframe, dfTicker: ' + str(len(dfTicker)))
 
-    return dfTicker
+    return dfTicker,logData
 
 def finalDataFrame(index):
     if index == 'news':
-        df = (themedf(index,'',yesterdayDate, f'{currentDate}' +'T23:00:00').explode('tickers').dropna())
+        df = themedf(index,'',yesterdayDate, f'{currentDate}' +'T23:00:00')[0].explode('tickers').dropna()
+        logData = themedf(index,'',yesterdayDate, f'{currentDate}' +'T23:00:00')[1]
+
         df['adj_sentiment_score'] = df['sentiment_score']/df['length']
         groupby_df = (
         df.groupby(['published_datetime', 'tickers']).agg({'adj_sentiment_score': ['mean']}).reset_index())
@@ -137,10 +132,12 @@ def finalDataFrame(index):
         dfnew['average sentiment'] = ((groupby_df.adj_sentiment_score)['mean'])
         dfnew['key'] = dfnew['date'] + dfnew['ticker']
 
-        log.info('Length of Dataframe, dfnew: ' + str(len(dfnew)))
+        logData.info('Length of Dataframe, dfnew: ' + str(len(dfnew)))
 
     elif index == 'tweets':
-        df = (themedf(index, '', yesterdayDate, f'{currentDate}' + 'T23:00:00').explode('cashtags').dropna())
+        df = themedf(index, '', yesterdayDate, f'{currentDate}' + 'T23:00:00')[0].explode('cashtags').dropna()
+        logData = themedf(index, '', yesterdayDate, f'{currentDate}' + 'T23:00:00')[1]
+
         df['adj_sentiment_score'] = df['sentiment_score']/df['length']
         groupby_df = (df.groupby(['timestamp', 'cashtags']).agg({'sentiment_score': ['mean']}).reset_index())
 
@@ -150,7 +147,7 @@ def finalDataFrame(index):
         dfnew['average sentiment'] = ((groupby_df.sentiment_score)['mean'])
         dfnew['key'] = dfnew['date'] + dfnew['ticker']
 
-        log.info('Length of Dataframe, dfnew: ' + str(len(dfnew)))
+        logData.info('Length of Dataframe, dfnew: ' + str(len(dfnew)))
 
     return dfnew
 
@@ -164,17 +161,17 @@ def finalSave(df,index):
             path = f'{finalSaveLocationNews}'+f'{currentDate}'+'.csv'
             cleandf.to_csv(path,index=False)
 
-            log.info('Successfully sent to Final Data News Directory: ' + path)
+            logData.info('Successfully sent to Final Data News Directory: ' + path)
 
         except Exception as e:
-            log.debug('ERROR SENDING FILE: ' + path)
+            logData.debug('ERROR SENDING FILE: ' + path)
 
     elif index == 'tweets':
         try:
             path = f'{finalSaveLocationTweets}' + f'{currentDate}'+'.csv'
             cleandf.to_csv(path, index = False)
 
-            log.info('Successfully sent to Final Data Tweets Directory: ' + path)
+            logData.info('Successfully sent to Final Data Tweets Directory: ' + path)
 
         except Exception as e:
-            log.debug('ERROR SENDING FILE: ' + path)
+            logData.debug('ERROR SENDING FILE: ' + path)
